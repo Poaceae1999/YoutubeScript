@@ -1,11 +1,8 @@
-torch
 requests
 langdetect
 TTS
 yt-dlp
-webvtt
 python-docx
-openai-whisper
 ollama
 chardet
 librosa
@@ -16,6 +13,10 @@ inflect
 unidecode
 pypinyin
 cn2an
+eng_to_ipa
+jieba
 six
 webvtt-py
 opencv-python
+PyQt5
+tqdm

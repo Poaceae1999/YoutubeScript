@@ -9,6 +9,13 @@ from langdetect import detect
 from pydub import AudioSegment
 from auxiliary_function import chunk_string_by_words
 from logger import logger
+import torch
+import torchaudio
+import ChatTTS
+import re
+import string
+from opencc import OpenCC
+
 def detect_language(response_text,language):
     
     detected_language = detect(response_text)
@@ -21,6 +28,37 @@ def detect_language(response_text,language):
     ) & (language == "en"):
         language = "zh"
     return language
+
+def generate_audio_ChatTTS(text, output_dir, pure_filename, language, speaker='default', mimic_tone_reference=False):
+    chat = ChatTTS.Chat()
+    chat.load_models()
+    params_refine_text=None
+    params_infer_code=None
+    if params_refine_text is None:
+        params_refine_text = {
+            'prompt': '[oral_2][laugh_0][break_6][speed_6]'
+        }
+    if params_infer_code is None:
+        params_infer_code = {
+            'spk_emb': chat.sample_random_speaker(),
+            'temperature': .3,
+            'top_P': 0.7,
+            'top_K': 20,
+        }
+
+    inputs = re.sub(f'[{string.punctuation}]', '', text)
+    # turn traditional chinese to simplify chinese since ChatTTS didn't support traditional chinese
+    cc = OpenCC('t2s')
+    inputs = cc.convert(text)
+
+    audio_array = chat.infer(inputs, params_refine_text=params_refine_text)
+    src_path = os.path.join(output_dir, f'{pure_filename}.wav')
+    torchaudio.save(src_path, torch.from_numpy(audio_array[0]), 24000)
+    AudioSegment.from_wav(src_path).export(os.path.join(output_dir, f'{pure_filename}.mp3'), format="mp3")
+    os.remove(src_path)  
+    return 
+
+
 
 def generate_audio_openvoice(text, output_dir, pure_filename, language, speaker='default', mimic_tone_reference=False):
     """
