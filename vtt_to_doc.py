@@ -7,6 +7,7 @@ from docx.oxml import parse_xml
 import webvtt
 from SceneExtractor import detect_scene_changes
 import cv2
+import os
 from logger import logger
 
 def timecode_to_seconds(timecode):
@@ -261,6 +262,7 @@ def add_frame_to_docx(cap, timestamp, para):
     # Add the frame to the docx file
     run = para.add_run("\n\n")
     run.add_picture(frame_file, width=Cm(15))
+    os.remove(frame_file)  # Remove the temporary frame file
     return para  # Return the original Paragraph object
 
 

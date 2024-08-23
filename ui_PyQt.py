@@ -1,10 +1,15 @@
+import sys
+# 重定向标准输出和标准错误
+import os
+sys.stdout = open(os.devnull, 'w')
+sys.stderr = open(os.devnull, 'w')
 from PyQt5.QtWidgets import QTextEdit, QMessageBox,QApplication, QHeaderView,QWidget, QVBoxLayout, QPushButton, QComboBox, QLabel, QLineEdit, QFileDialog,QTableWidget,QTableWidgetItem
 from PyQt5.QtCore import QThread,pyqtSignal,Qt,QThreadPool
-import os
 from PyQt5.QtGui import QMovie,QColor
 from yt_transcript import main
-import sys
 from logger import SignalHandler, setup_logger
+
+
 class Args:
     def __init__(
     self,

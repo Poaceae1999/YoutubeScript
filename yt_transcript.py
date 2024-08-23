@@ -22,6 +22,7 @@ from logger import logger
 from auxiliary_function import chunk_string_by_words
 import webvtt
 
+
 def clean_vtt(filepath: str) -> str:
     """Clean up the content of a subtitle file (vtt) to a string
 
@@ -88,6 +89,17 @@ def playlist_urls(url):
             urls.append("https://www.youtube.com/watch?v=" + data["videoIds"][0])
     return urls
 
+def sanitize_filename(filename):
+    # 定義Windows檔案名稱不允許的字符
+    invalid_chars = r'[<>:"/\\|?*]'
+    
+    # 替換不允許的字符為下劃線
+    sanitized_filename = re.sub(invalid_chars, '_', filename)
+    
+    # 刪除結尾的點和空白
+    sanitized_filename = sanitized_filename.rstrip('. ')
+    
+    return sanitized_filename
 
 def parse_xml(url):
     """
@@ -214,39 +226,47 @@ def summary_video_from_link(
     def get_audio_filename(link):
         # Create a temporary directory using the context manager
         with tempfile.TemporaryDirectory() as temp_dir:
-            get_dl_audio_path_cmd = f'yt-dlp {link} -o "{temp_dir}/%(title)s.%(ext)s" -S "+size,+br" --extract-audio --audio-format mp3 --no-keep-video --quiet'
+            get_dl_audio_path_cmd = f'yt-dlp "{link}" -o "{temp_dir}\%(title)s.%(ext)s" -S "+size,+br"  --extract-audio --audio-format mp3 --no-keep-video --quiet'
             # Run the command without specifying the encoding
             subprocess.run(
-                get_dl_audio_path_cmd, shell=True, universal_newlines=True
+                get_dl_audio_path_cmd, shell=True, universal_newlines=True,stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL
             )
             file = os.listdir(temp_dir)
+            
             # Get the filename without extension
-            pure_filename = os.path.splitext(os.path.basename(file[0]))[0]
+            logger.info(f"command:{get_dl_audio_path_cmd}")
+            logger.info(f"temp dir:{temp_dir}")
+            logger.info(f"filename:{file}")
+            pure_filename = sanitize_filename(os.path.splitext(os.path.basename(file[0]))[0])
         # Normalize the filename
         # pure_filename = unicodedata.normalize("NFKD", pure_filename)
         return pure_filename
 
-    def get_video_lang(link, pure_filename):
+    def get_video_lang(link):
         with tempfile.TemporaryDirectory() as temp_dir:
-            download_video_cmd = f'yt-dlp {link} -o "{temp_dir}/%(title)s.%(ext)s" -S "+size,+br" --download-sections "*01:00-01:30" --extract-audio --audio-format mp3 --no-keep-video'
-            subprocess.run(download_video_cmd, shell=True)
-            sample_audio_path = os.path.join(temp_dir, f"{pure_filename}.mp3")
+            download_video_cmd = f'yt-dlp "{link}" -o "{temp_dir}\%(title)s.%(ext)s" -S "+size,+br" --download-sections "*01:00-01:30" --extract-audio --audio-format mp3 --no-keep-video'
+            subprocess.run(download_video_cmd, shell=True,stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+            sample_audio_path = os.path.join(temp_dir, f"{get_audio_filename(link)}.mp3")
             video_language = audio_language(sample_audio_path)
         return video_language
 
     logger.info(f"processing {link}")
     pure_filename = get_audio_filename(link)
     logger.info(f"video name:{pure_filename}")
-    video_language = get_video_lang(link, pure_filename)
+    video_language = get_video_lang(link)
     logger.info(f"video language:{video_language}")
     if args.pic_embed == "True":
         res_option = ''
     if args.pic_embed == "False":
-        res_option = '-S "+size,+br"'
+        res_option = ''
 
-    download_video_cmd = f'yt-dlp {link} -o "{audiopath}/%(title)s.%(ext)s" {res_option} --extract-audio --audio-format mp3 --keep-video --write-subs  --sub-format vtt --sub-langs {video_language}'
-    subprocess.run(download_video_cmd, shell=True)
-
+    download_video_cmd = f'yt-dlp "{link}" -o "{audiopath}\%(title)s.%(ext)s" {res_option} --extract-audio --audio-format mp3 --keep-video --write-subs  --sub-format vtt --sub-langs {video_language}'
+    subprocess.run(download_video_cmd, shell=True,stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+    os.rename(f"{os.path.join(audiopath, pure_filename)}.mp3",f"{os.path.join(audiopath, sanitize_filename(pure_filename))}.mp3")
+    pure_filename = sanitize_filename(pure_filename)
     download_subtitle_file(audiopath, pure_filename, video_language, text_output_dir)
     # llm
     vtt_file = os.path.join(text_output_dir, f"{pure_filename}.vtt")
@@ -272,6 +292,9 @@ def summary_video_from_link(
         args, link, integrate_text_output_dir, pure_filename, chunks
     )
     if args.TTS_create == "True":
+        # generate_audio_ChatTTS(
+        #     response_text, post_audio_output_dir,pure_filename, args.language
+        # )
         generate_audio_openvoice(
             response_text, post_audio_output_dir,pure_filename, args.language
         )
@@ -436,7 +459,7 @@ def initialize_directories(args, logger):
 
 
 def main(args=parse_arguments()):
-
+    sys.stdout.reconfigure(encoding='utf-8')
     logger.info(f"parameters:" + str(args))
 
     audiopath, text_output_dir, integrate_text_output_dir, post_audio_output_dir = (
@@ -481,3 +504,4 @@ def main(args=parse_arguments()):
 
 if __name__ == "__main__":
     main()
+    
